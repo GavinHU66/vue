@@ -51,6 +51,7 @@ export function initState (vm: Component) {
   if (opts.props) initProps(vm, opts.props)
   if (opts.methods) initMethods(vm, opts.methods)
   if (opts.data) {
+    // 在这里进行Vue参数的初始化
     initData(vm)
   } else {
     observe(vm._data = {}, true /* asRootData */)
@@ -110,6 +111,7 @@ function initProps (vm: Component, propsOptions: Object) {
 }
 
 function initData (vm: Component) {
+  // 取到Vue的option.data数据
   let data = vm.$options.data
   data = vm._data = typeof data === 'function'
     ? getData(data, vm)
@@ -148,6 +150,7 @@ function initData (vm: Component) {
     }
   }
   // observe data
+  // 给data建立一个Observer实例（或者返回已有Observer实例）
   observe(data, true /* asRootData */)
 }
 

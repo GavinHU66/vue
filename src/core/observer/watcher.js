@@ -53,6 +53,8 @@ export default class Watcher {
     if (isRenderWatcher) {
       vm._watcher = this
     }
+
+    // 收集创建的watcher，destroy时将所有所储存的watcher销毁
     vm._watchers.push(this)
     // options
     if (options) {
@@ -79,6 +81,8 @@ export default class Watcher {
     if (typeof expOrFn === 'function') {
       this.getter = expOrFn
     } else {
+
+      // 为 getter 解析表达式
       this.getter = parsePath(expOrFn)
       if (!this.getter) {
         this.getter = noop
@@ -99,6 +103,9 @@ export default class Watcher {
    * Evaluate the getter, and re-collect dependencies.
    */
   get () {
+    
+    // 在这里将自己加进 Dep：targetStack
+    // 触发 Dep.target = target
     pushTarget(this)
     let value
     const vm = this.vm
@@ -116,6 +123,8 @@ export default class Watcher {
       if (this.deep) {
         traverse(value)
       }
+
+      // 将 Dep.target 释放
       popTarget()
       this.cleanupDeps()
     }
@@ -161,12 +170,13 @@ export default class Watcher {
    * Subscriber interface.
    * Will be called when a dependency changes.
    */
+  // 触发 this.run()
   update () {
     /* istanbul ignore else */
     if (this.lazy) {
       this.dirty = true
     } else if (this.sync) {
-      this.run()
+      this.run() // 触发 this.cb.call(this.vm, value, oldValue)
     } else {
       queueWatcher(this)
     }

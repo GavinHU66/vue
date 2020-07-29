@@ -14,6 +14,7 @@ function Vue (options) {
   this._init(options)
 }
 
+// initMixin中，实现了Vue数据双向绑定
 initMixin(Vue)
 stateMixin(Vue)
 eventsMixin(Vue)

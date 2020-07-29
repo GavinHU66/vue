@@ -34,24 +34,48 @@ export function toggleObserving (value: boolean) {
  * object's property keys into getter/setters that
  * collect dependencies and dispatch updates.
  */
+// 观察者，使用 getter/setter方法覆盖默认的读写操作，把对象封装成响应式
 export class Observer {
+
+  // 原始值
   value: any;
+
+  // 依赖的列表，装有依赖，即订阅者
   dep: Dep;
   vmCount: number; // number of vms that have this object as root $data
 
   constructor (value: any) {
     this.value = value
+    
+    // 每一个Observer（观察者）对象都有一个 Dep 实例，作为订阅管理器，管理此观察者的订阅者
     this.dep = new Dep()
     this.vmCount = 0
+
+    // def 是 defineProperty 的简单封装:
+    // 为 value 对象设置 '__ob__' 属性，修饰器属性为 this
+    // export function def (obj: Object, key: string, val: any, enumerable?: boolean) {
+    //   Object.defineProperty(obj, key, {
+    //     value: val,
+    //     enumerable: !!enumerable,
+    //     writable: true,
+    //     configurable: true
+    //   })
+    // }
     def(value, '__ob__', this)
+
+    // 如果value是Array，那么调用observeArray对每一个元素进行observe方法处理
     if (Array.isArray(value)) {
       if (hasProto) {
+        // protoAugment 使用原型链继承 
+        // value.__proto__ = arrayMethods
         protoAugment(value, arrayMethods)
       } else {
+        // copyAugment 使用原型链定义，对于每一个数组进行 defineProperty
         copyAugment(value, arrayMethods, arrayKeys)
       }
       this.observeArray(value)
     } else {
+      // 如果value是对象/基本类型，那么调用walk对每一个属性进行defineReactive方法处理
       this.walk(value)
     }
   }
@@ -107,25 +131,35 @@ function copyAugment (target: Object, src: Object, keys: Array<string>) {
  * returns the new observer if successfully observed,
  * or the existing observer if the value already has one.
  */
+// 将数据设置成响应式的（设置getter/setter）
+// 为 value 创建一个 Observer 观察者实例
 export function observe (value: any, asRootData: ?boolean): Observer | void {
   if (!isObject(value) || value instanceof VNode) {
     return
   }
   let ob: Observer | void
+
+  // 如果value已有Observer实例，则直接返回此实例
+  // 这个Observer实例储存在 __ob__ 中
   if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
     ob = value.__ob__
-  } else if (
+  } 
+  // 如果value还没有Observer实例，则为value建立一个观察者Observer实例
+  // 排除非单纯的对象，例如Regexp/vm实例/不可拓展的
+  else if ( 
     shouldObserve &&
-    !isServerRendering() &&
-    (Array.isArray(value) || isPlainObject(value)) &&
-    Object.isExtensible(value) &&
+    !isServerRendering() && // 如果不是服务器渲染
+    (Array.isArray(value) || isPlainObject(value)) && // 如果是对象Object或者数组Array
+    Object.isExtensible(value) && // 如果是可拓展的
     !value._isVue
   ) {
+    // 为value建立一个观察者Observer实例
     ob = new Observer(value)
   }
   if (asRootData && ob) {
     ob.vmCount++
   }
+  // 返回Observer实例
   return ob
 }
 
@@ -153,15 +187,21 @@ export function defineReactive (
     val = obj[key]
   }
 
+  // observe(val) 而非 observe(val, true)：asRootData 为 false
   let childOb = !shallow && observe(val)
+
+  // 覆盖 get/set
   Object.defineProperty(obj, key, {
     enumerable: true,
     configurable: true,
+
+    // get：添加 watcher(即Dep.target) 到 dep
     get: function reactiveGetter () {
       const value = getter ? getter.call(obj) : val
+      // 响应式：getter中将 Dep.target（一个订阅者Watcher）添加至 dep.subs中
       if (Dep.target) {
-        dep.depend()
-        if (childOb) {
+        dep.depend() // dep.depend() -> Dep: Dep.target.addDep(this) -> Watcher: dep.addSub(this) -> Dep: this.subs.push(sub)
+        if (childOb) { // 如果属性是Object对象则继续收集依赖
           childOb.dep.depend()
           if (Array.isArray(value)) {
             dependArray(value)
@@ -170,6 +210,8 @@ export function defineReactive (
       }
       return value
     },
+
+    // set：通知 dep 中的所有订阅者
     set: function reactiveSetter (newVal) {
       const value = getter ? getter.call(obj) : val
       /* eslint-disable no-self-compare */
@@ -188,6 +230,8 @@ export function defineReactive (
         val = newVal
       }
       childOb = !shallow && observe(newVal)
+
+      // 通知 dep 中的所有订阅者
       dep.notify()
     }
   })
