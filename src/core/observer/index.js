@@ -70,7 +70,7 @@ export class Observer {
         // value.__proto__ = arrayMethods
         protoAugment(value, arrayMethods)
       } else {
-        // copyAugment 使用原型链定义，对于每一个数组进行 defineProperty
+        // copyAugment 使用原型链定义，对于每一个数组进行 defineProperty，相当于一个深拷贝
         copyAugment(value, arrayMethods, arrayKeys)
       }
       this.observeArray(value)
@@ -199,6 +199,7 @@ export function defineReactive (
     get: function reactiveGetter () {
       const value = getter ? getter.call(obj) : val
       // 响应式：getter中将 Dep.target（一个订阅者Watcher）添加至 dep.subs中
+      // 第一次运行的时候还没有 Dep.target，在编译模版的时候，实例化一个订阅者Watcher时，会设置 Dep.target，并触发以下操作
       if (Dep.target) {
         dep.depend() // dep.depend() -> Dep: Dep.target.addDep(this) -> Watcher: dep.addSub(this) -> Dep: this.subs.push(sub)
         if (childOb) { // 如果属性是Object对象则继续收集依赖

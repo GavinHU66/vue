@@ -66,22 +66,31 @@ export default class Watcher {
     } else {
       this.deep = this.user = this.lazy = this.sync = false
     }
+
+    // 实例化此 Watcher
     this.cb = cb
     this.id = ++uid // uid for batching
     this.active = true
     this.dirty = this.lazy // for lazy watchers
+
+    // 上一轮收集的依赖集合Dep以及对应的id
     this.deps = []
-    this.newDeps = []
     this.depIds = new Set()
+
+    // 新收集的依赖集合Dep以及对应的id
+    this.newDeps = []
     this.newDepIds = new Set()
+
+
     this.expression = process.env.NODE_ENV !== 'production'
       ? expOrFn.toString()
       : ''
     // parse expression for getter
+    // 形如 {{ count++ }}
     if (typeof expOrFn === 'function') {
       this.getter = expOrFn
     } else {
-
+      // 形如 {{ obj.subObj.subsubObj }}
       // 为 getter 解析表达式
       this.getter = parsePath(expOrFn)
       if (!this.getter) {
@@ -94,6 +103,8 @@ export default class Watcher {
         )
       }
     }
+
+    // 最终触发 this.get()
     this.value = this.lazy
       ? undefined
       : this.get()
@@ -103,13 +114,16 @@ export default class Watcher {
    * Evaluate the getter, and re-collect dependencies.
    */
   get () {
-    
-    // 在这里将自己加进 Dep：targetStack
+    // 在这里将自己加进 Dep：targetStack 将Dep.target指向自身
     // 触发 Dep.target = target
     pushTarget(this)
     let value
     const vm = this.vm
     try {
+      // 触发updateComponent，
+      // 也就是执行_render() 生成VNode，并执行_update()，将VNode渲染成真实DOM
+      // 在render() 过程中会对模板进行编译，此时就会对data进行访问从而触发getter：由于此时Dep.target已经指向了此 Watcher
+      // 近而 dep.addSub(this) 将自身push到属性对应的dep.subs中
       value = this.getter.call(vm, vm)
     } catch (e) {
       if (this.user) {
@@ -123,9 +137,11 @@ export default class Watcher {
       if (this.deep) {
         traverse(value)
       }
-
+      
       // 将 Dep.target 释放
       popTarget()
+
+      // 上一轮不需要的依赖清除!举例
       this.cleanupDeps()
     }
     return value
@@ -148,6 +164,7 @@ export default class Watcher {
   /**
    * Clean up for dependency collection.
    */
+  // 清除上一轮中的依赖在新一轮中没有重新收集的，也就是数据刷新后某些数据不再被渲染出来了
   cleanupDeps () {
     let i = this.deps.length
     while (i--) {

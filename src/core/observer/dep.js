@@ -20,7 +20,7 @@ export default class Dep {
   // 每个观察者对象的订阅者lie biao的id，唯一标识
   id: number;
 
-  // 观察者对象的 
+  // 观察者对象的订阅者队列
   subs: Array<Watcher>;
 
   constructor () {
@@ -45,7 +45,7 @@ export default class Dep {
   }
 
   /**
-   * //通过watcher将自身添加到dep中
+   * 通过watcher将自身添加到dep中
    */
   depend () {
     if (Dep.target) { // Dep.target 即为一个 Watcher 实例
