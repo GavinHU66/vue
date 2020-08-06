@@ -53,31 +53,38 @@ export class Observer {
 
     // def 是 defineProperty 的简单封装:
     // 为 value 对象设置 '__ob__' 属性，修饰器属性为 this
-    // export function def (obj: Object, key: string, val: any, enumerable?: boolean) {
-    //   Object.defineProperty(obj, key, {
-    //     value: val,
-    //     enumerable: !!enumerable,
-    //     writable: true,
-    //     configurable: true
-    //   })
-    // }
+    // 之后再调用时，就直接返回这个属性，即 value.__ob__ = this
     def(value, '__ob__', this)
 
     // 如果value是Array，那么调用observeArray对每一个元素进行observe方法处理
+    // 并且对数组的7个变异方法（push、pop、shift、unshift、splice、sort、reverse）实现了响应式
+    // 对数组进行了特殊处理，不会执行 walk，也就是不会对每一项实施监控
+    // Vue 中是通过对每个键设置 getter/setter 来实现响应式的，开发者使用数组，目的往往是遍历，此时调用 getter 开销太大了，
+    // 所以 Vue 不在数组每个键上设置，跳过了对数组每个键设置响应式的过程，而是对值进行递归设置响应式
     if (Array.isArray(value)) {
+
+      // this.walkArr(value)
+
       if (hasProto) {
         // protoAugment 使用原型链继承 
-        // value.__proto__ = arrayMethods
+        // 即：value.__proto__ = arrayMethods
         protoAugment(value, arrayMethods)
       } else {
         // copyAugment 使用原型链定义，对于每一个数组进行 defineProperty，相当于一个深拷贝
         copyAugment(value, arrayMethods, arrayKeys)
       }
       this.observeArray(value)
+
     } else {
       // 如果value是对象/基本类型，那么调用walk对每一个属性进行defineReactive方法处理
       this.walk(value)
     }
+  }
+
+  walkArr(arr: Array) {
+    arr.forEach((item, index) => {
+      defineReactive(arr, index)
+    })
   }
 
   /**
@@ -132,19 +139,23 @@ function copyAugment (target: Object, src: Object, keys: Array<string>) {
  * or the existing observer if the value already has one.
  */
 // 将数据设置成响应式的（设置getter/setter）
-// 为 value 创建一个 Observer 观察者实例
+// 为 value 创建一个 Observer 观察者实例，或返回 value 已有 Observer 观察者实例
 export function observe (value: any, asRootData: ?boolean): Observer | void {
   if (!isObject(value) || value instanceof VNode) {
     return
   }
   let ob: Observer | void
 
-  // 如果value已有Observer实例，则直接返回此实例
-  // 这个Observer实例储存在 __ob__ 中
+  // 返回 value 已有 Observer 观察者实例
+  // 如果value已有Observer实例，则直接返回此实例，这个Observer实例储存在 __ob__ 中
   if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
     ob = value.__ob__
   } 
+
+
+  // 为 value 创建一个 Observer 观察者实例
   // 如果value还没有Observer实例，则为value建立一个观察者Observer实例
+  
   // 排除非单纯的对象，例如Regexp/vm实例/不可拓展的
   else if ( 
     shouldObserve &&
@@ -153,12 +164,12 @@ export function observe (value: any, asRootData: ?boolean): Observer | void {
     Object.isExtensible(value) && // 如果是可拓展的
     !value._isVue
   ) {
-    // 为value建立一个观察者Observer实例
-    ob = new Observer(value)
+    ob = new Observer(value) // 为value建立一个观察者Observer实例
   }
   if (asRootData && ob) {
     ob.vmCount++
   }
+
   // 返回Observer实例
   return ob
 }
@@ -195,9 +206,10 @@ export function defineReactive (
     enumerable: true,
     configurable: true,
 
-    // get：添加 watcher(即Dep.target) 到 dep
+    // get：添加 watcher (即Dep.target) 到 dep
     get: function reactiveGetter () {
       const value = getter ? getter.call(obj) : val
+
       // 响应式：getter中将 Dep.target（一个订阅者Watcher）添加至 dep.subs中
       // 第一次运行的时候还没有 Dep.target，在编译模版的时候，实例化一个订阅者Watcher时，会设置 Dep.target，并触发以下操作
       if (Dep.target) {
@@ -214,6 +226,7 @@ export function defineReactive (
 
     // set：通知 dep 中的所有订阅者
     set: function reactiveSetter (newVal) {
+      console.log('set', newVal);
       const value = getter ? getter.call(obj) : val
       /* eslint-disable no-self-compare */
       if (newVal === value || (newVal !== newVal && value !== value)) {
@@ -232,7 +245,7 @@ export function defineReactive (
       }
       childOb = !shallow && observe(newVal)
 
-      // 通知 dep 中的所有订阅者
+      // 每次get都通知 dep 中的所有订阅者
       dep.notify()
     }
   })

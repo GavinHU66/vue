@@ -1,4 +1,4 @@
-// Vue实例在这引入
+// 这里
 import Vue from './instance/index'
 import { initGlobalAPI } from './global-api/index'
 import { isServerRendering } from 'core/util/env'

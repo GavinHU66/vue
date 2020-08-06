@@ -35,6 +35,8 @@ const sharedPropertyDefinition = {
   set: noop
 }
 
+// 为 data、props 等添加中介，方便访问
+// 昔日的 vm.data[key]，现在可以由 vm[key] 读写
 export function proxy (target: Object, sourceKey: string, key: string) {
   sharedPropertyDefinition.get = function proxyGetter () {
     return this[sourceKey][key]
@@ -48,11 +50,16 @@ export function proxy (target: Object, sourceKey: string, key: string) {
 export function initState (vm: Component) {
   vm._watchers = []
   const opts = vm.$options
+
+  // 对于 props 的处理
   if (opts.props) initProps(vm, opts.props)
+
+  // 对于 methods 的处理
   if (opts.methods) initMethods(vm, opts.methods)
+
+  // 对于 data 的处理
   if (opts.data) {
-    // 在这里进行Vue参数的初始化
-    initData(vm)
+    initData(vm) // 在这里进行Vue参数的初始化
   } else {
     observe(vm._data = {}, true /* asRootData */)
   }
@@ -113,9 +120,13 @@ function initProps (vm: Component, propsOptions: Object) {
 function initData (vm: Component) {
   // 取到Vue的option.data数据
   let data = vm.$options.data
+
+  // 如果是 function，调用 getData
+  // 如果不是 funtion，则继续
   data = vm._data = typeof data === 'function'
     ? getData(data, vm)
     : data || {}
+
   if (!isPlainObject(data)) {
     data = {}
     process.env.NODE_ENV !== 'production' && warn(
@@ -124,6 +135,7 @@ function initData (vm: Component) {
       vm
     )
   }
+
   // proxy data on instance
   const keys = Object.keys(data)
   const props = vm.$options.props
@@ -146,6 +158,8 @@ function initData (vm: Component) {
         vm
       )
     } else if (!isReserved(key)) {
+
+      // 为 vm._data 设置 proxy
       proxy(vm, `_data`, key)
     }
   }
