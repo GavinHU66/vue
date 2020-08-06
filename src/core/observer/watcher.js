@@ -114,9 +114,10 @@ export default class Watcher {
    * Evaluate the getter, and re-collect dependencies.
    */
   get () {
-    // 在这里将自己加进 Dep：targetStack 将Dep.target指向自身
+    // 在这里将自己加进 Dep targetStack 将Dep.target指向自身
     // 触发 Dep.target = target
     pushTarget(this)
+    
     let value
     const vm = this.vm
     try {

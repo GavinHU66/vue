@@ -717,8 +717,9 @@
    * directives subscribing to it.
    */
   // Dependency依赖的缩写
+  // Dep是一个发布者，负责收集依赖，当数据更新是去通知订阅者
   var Dep = function Dep () {
-    this.id = uid++;
+    this.id = uid++; // 每次递增
     this.subs = [];
   };
 
@@ -742,8 +743,8 @@
    * 通过watcher将自身添加到dep中
    */
   Dep.prototype.depend = function depend () {
-    if (Dep.target) { // Dep.target 即为一个 Watcher 实例
-      Dep.target.addDep(this);
+    if (Dep.target) { // Dep.target 即为一个订阅者Watcher实例
+      Dep.target.addDep(this); // 将自身作为参数传给 Watcher
     }
   };
 
@@ -958,7 +959,6 @@
     if (Array.isArray(value)) {
 
       // this.walkArr(value)
-
       if (hasProto) {
         // protoAugment 使用原型链继承 
         // 即：value.__proto__ = arrayMethods
@@ -4553,9 +4553,10 @@
    * Evaluate the getter, and re-collect dependencies.
    */
   Watcher.prototype.get = function get () {
-    // 在这里将自己加进 Dep：targetStack 将Dep.target指向自身
+    // 在这里将自己加进 Dep targetStack 将Dep.target指向自身
     // 触发 Dep.target = target
     pushTarget(this);
+      
     var value;
     var vm = this.vm;
     try {

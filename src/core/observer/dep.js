@@ -11,20 +11,21 @@ let uid = 0
  * directives subscribing to it.
  */
 // Dependency依赖的缩写
+// Dep是一个发布者，负责收集依赖，当数据更新是去通知订阅者
 export default class Dep {
 
   // 全剧唯一的订阅者对象
   // “唯一” 是因为只能同时计算个更新一个订阅者的值
   static target: ?Watcher;
 
-  // 每个观察者对象的订阅者lie biao的id，唯一标识
+  // 每个观察者对象的订阅者队列的id，唯一标识
   id: number;
 
   // 观察者对象的订阅者队列
   subs: Array<Watcher>;
 
   constructor () {
-    this.id = uid++
+    this.id = uid++ // 每次递增
     this.subs = []
   }
 
@@ -48,8 +49,8 @@ export default class Dep {
    * 通过watcher将自身添加到dep中
    */
   depend () {
-    if (Dep.target) { // Dep.target 即为一个 Watcher 实例
-      Dep.target.addDep(this)
+    if (Dep.target) { // Dep.target 即为一个订阅者Watcher实例
+      Dep.target.addDep(this) // 将自身作为参数传给 Watcher
     }
   }
 

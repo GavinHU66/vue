@@ -64,7 +64,6 @@ export class Observer {
     if (Array.isArray(value)) {
 
       // this.walkArr(value)
-
       if (hasProto) {
         // protoAugment 使用原型链继承 
         // 即：value.__proto__ = arrayMethods
