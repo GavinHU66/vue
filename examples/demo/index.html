@@ -4,15 +4,30 @@
     </header>
     <body>
         <div id="app">
-
             <div>{{msg}}</div>
+            arr: <button v-for="(item1, index) in arr" @click="changeItem(item1, index)">{{item1}}</button>
+            objArr: <button v-for="(item2, index) in objArr" @click="changeObjItem(item2, index)">{{item2.a}}</button>
         </div>
         <script>
             // here
             new Vue({
                 el: '#app',
                 data : {
-                    msg: 'Hello World'
+                    msg: 'Hello World',
+                    arr: [1, 2, 3],
+                    objArr: [
+                        {a: 1},
+                        {a: 2},
+                        {a: 3}
+                    ]
+                },
+                methods: {
+                    changeItem (item, index) {
+                        this.arr[index] = 0
+                    },
+                    changeObjItem (item, index) {
+                        this.objArr[index].a = 0
+                    }
                 }
             })
         </script>

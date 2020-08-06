@@ -1,3 +1,4 @@
+// 这里
 import { initMixin } from './init'
 import { stateMixin } from './state'
 import { renderMixin } from './render'
@@ -14,6 +15,7 @@ function Vue (options) {
   this._init(options)
 }
 
+// 这里
 // initMixin中，实现了Vue数据双向绑定
 initMixin(Vue)
 stateMixin(Vue)

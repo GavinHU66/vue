@@ -507,6 +507,9 @@
    * Parse simple path.
    */
   var bailRE = new RegExp(("[^" + (unicodeRegExp.source) + ".$_\\d]"));
+
+  // 解析 obj.subObj.subsubObj.subsubsubObj 类型的路径
+  // "obj.subObj.subsubObj.subsubsubObj" => return obj[subObj][subsubObj][subsubsubObj]
   function parsePath (path) {
     if (bailRE.test(path)) {
       return
@@ -719,20 +722,34 @@
     this.subs = [];
   };
 
+  /**
+   * 添加订阅者watcher
+   * @param {Object} sub Watcher实例
+   */
   Dep.prototype.addSub = function addSub (sub) {
     this.subs.push(sub);
   };
 
+  /**
+   * 移除订阅者watcher
+   * @param {Object} sub Watcher实例
+   */
   Dep.prototype.removeSub = function removeSub (sub) {
     remove(this.subs, sub);
   };
 
+  /**
+   * 通过watcher将自身添加到dep中
+   */
   Dep.prototype.depend = function depend () {
-    if (Dep.target) {
+    if (Dep.target) { // Dep.target 即为一个 Watcher 实例
       Dep.target.addDep(this);
     }
   };
 
+  /**
+   * 发布消息给所有订阅者watcher
+   */
   Dep.prototype.notify = function notify () {
     // stabilize the subscriber list first
     var subs = this.subs.slice();
@@ -930,30 +947,38 @@
 
     // def 是 defineProperty 的简单封装:
     // 为 value 对象设置 '__ob__' 属性，修饰器属性为 this
-    // export function def (obj: Object, key: string, val: any, enumerable?: boolean) {
-    // Object.defineProperty(obj, key, {
-    //   value: val,
-    //   enumerable: !!enumerable,
-    //   writable: true,
-    //   configurable: true
-    // })
-    // }
+    // 之后再调用时，就直接返回这个属性，即 value.__ob__ = this
     def(value, '__ob__', this);
 
     // 如果value是Array，那么调用observeArray对每一个元素进行observe方法处理
+    // 并且对数组的7个变异方法（push、pop、shift、unshift、splice、sort、reverse）实现了响应式
+    // 对数组进行了特殊处理，不会执行 walk，也就是不会对每一项实施监控
+    // Vue 中是通过对每个键设置 getter/setter 来实现响应式的，开发者使用数组，目的往往是遍历，此时调用 getter 开销太大了，
+    // 所以 Vue 不在数组每个键上设置，跳过了对数组每个键设置响应式的过程，而是对值进行递归设置响应式
     if (Array.isArray(value)) {
+
+      // this.walkArr(value)
+
       if (hasProto) {
-        // protoAugment 使用原型链继承
+        // protoAugment 使用原型链继承 
+        // 即：value.__proto__ = arrayMethods
         protoAugment(value, arrayMethods);
       } else {
-        // copyAugment 使用原型链定义，对于每一个数组进行 defineProperty
+        // copyAugment 使用原型链定义，对于每一个数组进行 defineProperty，相当于一个深拷贝
         copyAugment(value, arrayMethods, arrayKeys);
       }
       this.observeArray(value);
+
     } else {
       // 如果value是对象/基本类型，那么调用walk对每一个属性进行defineReactive方法处理
       this.walk(value);
     }
+  };
+
+  Observer.prototype.walkArr = function walkArr (arr) {
+    arr.forEach(function (item, index) {
+      defineReactive(arr, index);
+    });
   };
 
   /**
@@ -1007,19 +1032,23 @@
    * or the existing observer if the value already has one.
    */
   // 将数据设置成响应式的（设置getter/setter）
-  // 为 value 创建一个 Observer 观察者实例
+  // 为 value 创建一个 Observer 观察者实例，或返回 value 已有 Observer 观察者实例
   function observe (value, asRootData) {
     if (!isObject(value) || value instanceof VNode) {
       return
     }
     var ob;
 
-    // 如果value已有Observer实例，则直接返回此实例
-    // 这个Observer实例储存在 __ob__ 中
+    // 返回 value 已有 Observer 观察者实例
+    // 如果value已有Observer实例，则直接返回此实例，这个Observer实例储存在 __ob__ 中
     if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
       ob = value.__ob__;
     } 
+
+
+    // 为 value 创建一个 Observer 观察者实例
     // 如果value还没有Observer实例，则为value建立一个观察者Observer实例
+    
     // 排除非单纯的对象，例如Regexp/vm实例/不可拓展的
     else if ( 
       shouldObserve &&
@@ -1028,12 +1057,12 @@
       Object.isExtensible(value) && // 如果是可拓展的
       !value._isVue
     ) {
-      // 为value建立一个观察者Observer实例
-      ob = new Observer(value);
+      ob = new Observer(value); // 为value建立一个观察者Observer实例
     }
     if (asRootData && ob) {
       ob.vmCount++;
     }
+
     // 返回Observer实例
     return ob
   }
@@ -1062,15 +1091,23 @@
       val = obj[key];
     }
 
+    // observe(val) 而非 observe(val, true)：asRootData 为 false
     var childOb = !shallow && observe(val);
+
+    // 覆盖 get/set
     Object.defineProperty(obj, key, {
       enumerable: true,
       configurable: true,
+
+      // get：添加 watcher (即Dep.target) 到 dep
       get: function reactiveGetter () {
         var value = getter ? getter.call(obj) : val;
+
+        // 响应式：getter中将 Dep.target（一个订阅者Watcher）添加至 dep.subs中
+        // 第一次运行的时候还没有 Dep.target，在编译模版的时候，实例化一个订阅者Watcher时，会设置 Dep.target，并触发以下操作
         if (Dep.target) {
-          dep.depend();
-          if (childOb) {
+          dep.depend(); // dep.depend() -> Dep: Dep.target.addDep(this) -> Watcher: dep.addSub(this) -> Dep: this.subs.push(sub)
+          if (childOb) { // 如果属性是Object对象则继续收集依赖
             childOb.dep.depend();
             if (Array.isArray(value)) {
               dependArray(value);
@@ -1079,7 +1116,10 @@
         }
         return value
       },
+
+      // set：通知 dep 中的所有订阅者
       set: function reactiveSetter (newVal) {
+        console.log('set', newVal);
         var value = getter ? getter.call(obj) : val;
         /* eslint-disable no-self-compare */
         if (newVal === value || (newVal !== newVal && value !== value)) {
@@ -1097,6 +1137,8 @@
           val = newVal;
         }
         childOb = !shallow && observe(newVal);
+
+        // 每次get都通知 dep 中的所有订阅者
         dep.notify();
       }
     });
@@ -4451,6 +4493,8 @@
     if (isRenderWatcher) {
       vm._watcher = this;
     }
+
+    // 收集创建的watcher，destroy时将所有所储存的watcher销毁
     vm._watchers.push(this);
     // options
     if (options) {
@@ -4462,20 +4506,31 @@
     } else {
       this.deep = this.user = this.lazy = this.sync = false;
     }
+
+    // 实例化此 Watcher
     this.cb = cb;
     this.id = ++uid$1; // uid for batching
     this.active = true;
     this.dirty = this.lazy; // for lazy watchers
+
+    // 上一轮收集的依赖集合Dep以及对应的id
     this.deps = [];
-    this.newDeps = [];
     this.depIds = new _Set();
+
+    // 新收集的依赖集合Dep以及对应的id
+    this.newDeps = [];
     this.newDepIds = new _Set();
+
+
     this.expression =  expOrFn.toString()
       ;
     // parse expression for getter
+    // 形如 {{ count++ }}
     if (typeof expOrFn === 'function') {
       this.getter = expOrFn;
     } else {
+      // 形如 {{ obj.subObj.subsubObj }}
+      // 为 getter 解析表达式
       this.getter = parsePath(expOrFn);
       if (!this.getter) {
         this.getter = noop;
@@ -4487,6 +4542,8 @@
         );
       }
     }
+
+    // 最终触发 this.get()
     this.value = this.lazy
       ? undefined
       : this.get();
@@ -4496,10 +4553,16 @@
    * Evaluate the getter, and re-collect dependencies.
    */
   Watcher.prototype.get = function get () {
+    // 在这里将自己加进 Dep：targetStack 将Dep.target指向自身
+    // 触发 Dep.target = target
     pushTarget(this);
     var value;
     var vm = this.vm;
     try {
+      // 触发updateComponent，
+      // 也就是执行_render() 生成VNode，并执行_update()，将VNode渲染成真实DOM
+      // 在render() 过程中会对模板进行编译，此时就会对data进行访问从而触发getter：由于此时Dep.target已经指向了此 Watcher
+      // 近而 dep.addSub(this) 将自身push到属性对应的dep.subs中
       value = this.getter.call(vm, vm);
     } catch (e) {
       if (this.user) {
@@ -4513,7 +4576,11 @@
       if (this.deep) {
         traverse(value);
       }
+        
+      // 将 Dep.target 释放
       popTarget();
+
+      // 上一轮不需要的依赖清除!举例
       this.cleanupDeps();
     }
     return value
@@ -4536,6 +4603,7 @@
   /**
    * Clean up for dependency collection.
    */
+  // 清除上一轮中的依赖在新一轮中没有重新收集的，也就是数据刷新后某些数据不再被渲染出来了
   Watcher.prototype.cleanupDeps = function cleanupDeps () {
     var i = this.deps.length;
     while (i--) {
@@ -4558,12 +4626,13 @@
    * Subscriber interface.
    * Will be called when a dependency changes.
    */
+  // 触发 this.run()
   Watcher.prototype.update = function update () {
     /* istanbul ignore else */
     if (this.lazy) {
       this.dirty = true;
     } else if (this.sync) {
-      this.run();
+      this.run(); // 触发 this.cb.call(this.vm, value, oldValue)
     } else {
       queueWatcher(this);
     }
@@ -4647,6 +4716,8 @@
     set: noop
   };
 
+  // 为 data、props 等添加中介，方便访问
+  // 昔日的 vm.data[key]，现在可以由 vm[key] 读写
   function proxy (target, sourceKey, key) {
     sharedPropertyDefinition.get = function proxyGetter () {
       return this[sourceKey][key]
@@ -4660,11 +4731,16 @@
   function initState (vm) {
     vm._watchers = [];
     var opts = vm.$options;
+
+    // 对于 props 的处理
     if (opts.props) { initProps(vm, opts.props); }
+
+    // 对于 methods 的处理
     if (opts.methods) { initMethods(vm, opts.methods); }
+
+    // 对于 data 的处理
     if (opts.data) {
-      // 在这里进行Vue参数的初始化
-      initData(vm);
+      initData(vm); // 在这里进行Vue参数的初始化
     } else {
       observe(vm._data = {}, true /* asRootData */);
     }
@@ -4725,9 +4801,13 @@
   function initData (vm) {
     // 取到Vue的option.data数据
     var data = vm.$options.data;
+
+    // 如果是 function，调用 getData
+    // 如果不是 funtion，则继续
     data = vm._data = typeof data === 'function'
       ? getData(data, vm)
       : data || {};
+
     if (!isPlainObject(data)) {
       data = {};
        warn(
@@ -4736,6 +4816,7 @@
         vm
       );
     }
+
     // proxy data on instance
     var keys = Object.keys(data);
     var props = vm.$options.props;
@@ -4758,6 +4839,8 @@
           vm
         );
       } else if (!isReserved(key)) {
+
+        // 为 vm._data 设置 proxy
         proxy(vm, "_data", key);
       }
     }
@@ -5027,6 +5110,7 @@
       callHook(vm, 'beforeCreate');
       initInjections(vm); // resolve injections before data/props
 
+      // 这里
       // 在这里进行Vue参数的初始化
       initState(vm);
       initProvide(vm); // resolve provide after data/props
@@ -5101,6 +5185,8 @@
     return modified
   }
 
+  // 这里
+
   function Vue (options) {
     if (
       !(this instanceof Vue)
@@ -5110,6 +5196,7 @@
     this._init(options);
   }
 
+  // 这里
   // initMixin中，实现了Vue数据双向绑定
   initMixin(Vue);
   stateMixin(Vue);
@@ -5458,8 +5545,7 @@
     initAssetRegisters(Vue);
   }
 
-  // Vue实例在这引入
-
+  // 这里
   initGlobalAPI(Vue);
 
   Object.defineProperty(Vue.prototype, '$isServer', {
