@@ -4081,6 +4081,7 @@
     };
   }
 
+  //
   function mountComponent (
     vm,
     el,
@@ -4496,6 +4497,7 @@
 
     // 收集创建的watcher，destroy时将所有所储存的watcher销毁
     vm._watchers.push(this);
+      
     // options
     if (options) {
       this.deep = !!options.deep;

@@ -138,6 +138,7 @@ export function lifecycleMixin (Vue: Class<Component>) {
   }
 }
 
+//
 export function mountComponent (
   vm: Component,
   el: ?Element,
